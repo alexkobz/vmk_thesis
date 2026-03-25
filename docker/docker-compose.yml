@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  jupyter:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8888:8888"
+    volumes:
+#      - ./:/home/jovyan/work
+      - ../:/home/jovyan/
+    environment:
+      - JUPYTER_ENABLE_LAB=yes

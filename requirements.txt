@@ -1,0 +1,13 @@
+loguru
+mkdocs
+pandas
+pip
+pytest
+python-dotenv
+ruff
+scikit-learn
+scipy
+sktime
+statsmodels
+tqdm
+typer
