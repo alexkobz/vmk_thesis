@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.evaluate import mape_by_secid, wmape
+from src.forecast.evaluate import mape_by_secid, wmape
 
 
 def _panel_series(values, secids, dates):
@@ -22,6 +22,14 @@ def _panel_series(values, secids, dates):
             {
                 "A": np.mean(np.abs((np.array([100, 110]) - np.array([90, 100])) / np.array([100, 110]))),
                 "B": np.mean(np.abs((np.array([50, 100]) - np.array([55, 80])) / np.array([50, 100]))),
+            },
+        ),
+        (
+            [10, 20, 30, 40],
+            [12, 19, 33, 36],
+            {
+                "A": np.mean(np.abs((np.array([10, 20]) - np.array([12, 19])) / np.array([10, 20]))),
+                "B": np.mean(np.abs((np.array([30, 40]) - np.array([33, 36])) / np.array([30, 40]))),
             },
         ),
     ],
@@ -59,7 +67,16 @@ def test_mape_by_secid_caps_and_eps(y_vals, yhat_vals, eps, max_ape, expected):
 @pytest.mark.parametrize(
     "y_vals,yhat_vals,expected",
     [
-        ([100, 200], [90, 210], (np.abs(np.array([100, 200]) - np.array([90, 210])).sum()) / np.array([100, 200]).sum()),
+        (
+            [100, 200],
+            [90, 210],
+            (np.abs(np.array([100, 200]) - np.array([90, 210])).sum()) / np.array([100, 200]).sum(),
+        ),
+        (
+            [10, 20],
+            [11, 19],
+            (np.abs(np.array([10, 20]) - np.array([11, 19])).sum()) / np.array([10, 20]).sum(),
+        ),
     ],
 )
 def test_wmape_unweighted(y_vals, yhat_vals, expected):
@@ -81,6 +98,13 @@ def test_wmape_unweighted(y_vals, yhat_vals, expected):
             [1, 3],
             (np.array([1, 3]) * np.abs(np.array([100, 200]) - np.array([90, 210]))).sum()
             / (np.array([1, 3]) * np.array([100, 200])).sum(),
+        ),
+        (
+            [10, 20],
+            [11, 19],
+            [2, 2],
+            (np.array([2, 2]) * np.abs(np.array([10, 20]) - np.array([11, 19]))).sum()
+            / (np.array([2, 2]) * np.array([10, 20])).sum(),
         ),
     ],
 )

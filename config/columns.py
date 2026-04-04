@@ -2,6 +2,12 @@
 Centralized column lists and schema definitions.
 """
 
+# Pipeline settings
+y_name: str = "dailycapitalization"
+index: list[str] = ["secid", "tradedate"]
+boards: set[str] = {"TQBR", "EQBR", "TQBS", "EQBS", "TQLV", "EQLV", "TQNL", "EQNL"}
+types: set[str] = {"common_share", "preferred_share"}
+
 # Column groups
 cat_cols: list[str] = ['sector', 'type']
 mults: list[str] = [
@@ -301,7 +307,7 @@ dtype_dict = {
     'secid': str,
     'tradedate': str,
     'dailycapitalization': float,
-    'log_returns_dailycapitalization_1': float,
+    'smoothed_log_returns_dailycapitalization_1': float,
     'log_returns_dailycapitalization_5': float,
     'log_returns_smoothed_capex_revenue_rsbu_1': float,
     'log_returns_smoothed_capex_revenue_msfo_1': float,
@@ -546,7 +552,6 @@ dtype_dict = {
     'log_returns_smoothed_line_6330_1': float,
     'log_returns_smoothed_line_6350_1': float,
     'log_returns_smoothed_line_6400_1': float,
-    'log_returns_smoothed_dailycapitalization_1': float,
     'cat__sector_consumer': float,
     'cat__sector_energy': float,
     'cat__sector_financial': float,
@@ -560,15 +565,16 @@ dtype_dict = {
     'cat__sector_utilities': float,
     'cat__type_common_share': float,
     'cat__type_preferred_share': float,
+    'mm__smoothed_capital_rsbu': float,
+    'mm__smoothed_current_ratio_msfo': float,
     'mm__smoothed_debt_ratio_msfo': float,
     'mm__smoothed_dpr_rsbu': float,
     'mm__smoothed_dpr_msfo': float,
+    'mm__smoothed_net_working_capital_msfo': float,
     'mm__smoothed_pffo_rsbu': float,
     'mm__smoothed_pffo_msfo': float,
+    'mm__smoothed_ps_rsbu': float,
     'mm__smoothed_line_1140': float,
-    'mm__smoothed_line_1310': float,
-    'mm__smoothed_line_1340': float,
-    'mm__smoothed_line_1360': float,
     'mm__smoothed_line_2900': float,
     'mm__smoothed_line_2910': float,
     'mm__smoothed_line_3212': float,
@@ -592,6 +598,7 @@ dtype_dict = {
     'mm__smoothed_line_4113': float,
     'mm__smoothed_line_421x': float,
     'mm__smoothed_line_4312': float,
+    'mm__smoothed_line_4314': float,
     'mm__smoothed_line_431x': float,
     'mm__smoothed_line_6100': float,
     'mm__smoothed_line_6200': float,
@@ -613,10 +620,8 @@ dtype_dict = {
     'mm__smoothed_line_6400': float,
     'st__smoothed_capex_revenue_rsbu': float,
     'st__smoothed_capex_revenue_msfo': float,
-    'st__smoothed_capital_rsbu': float,
     'st__smoothed_capital_msfo': float,
     'st__smoothed_current_ratio_rsbu': float,
-    'st__smoothed_current_ratio_msfo': float,
     'st__smoothed_debt_equity_rsbu': float,
     'st__smoothed_debt_equity_msfo': float,
     'st__smoothed_debt_ratio_rsbu': float,
@@ -637,7 +642,6 @@ dtype_dict = {
     'st__smoothed_net_margin_rsbu': float,
     'st__smoothed_net_margin_msfo': float,
     'st__smoothed_net_working_capital_rsbu': float,
-    'st__smoothed_net_working_capital_msfo': float,
     'st__smoothed_netdebt_ebitda_rsbu': float,
     'st__smoothed_netdebt_ebitda_msfo': float,
     'st__smoothed_operation_margin_rsbu': float,
@@ -650,7 +654,6 @@ dtype_dict = {
     'st__smoothed_pe_msfo': float,
     'st__smoothed_pfcf_rsbu': float,
     'st__smoothed_pfcf_msfo': float,
-    'st__smoothed_ps_rsbu': float,
     'st__smoothed_ps_msfo': float,
     'st__smoothed_roa_rsbu': float,
     'st__smoothed_roa_msfo': float,
@@ -679,8 +682,11 @@ dtype_dict = {
     'st__smoothed_line_1250': float,
     'st__smoothed_line_1260': float,
     'st__smoothed_line_1300': float,
+    'st__smoothed_line_1310': float,
     'st__smoothed_line_1320': float,
+    'st__smoothed_line_1340': float,
     'st__smoothed_line_1350': float,
+    'st__smoothed_line_1360': float,
     'st__smoothed_line_1370': float,
     'st__smoothed_line_1400': float,
     'st__smoothed_line_1410': float,
@@ -786,7 +792,6 @@ dtype_dict = {
     'st__smoothed_line_4310': float,
     'st__smoothed_line_4311': float,
     'st__smoothed_line_4313': float,
-    'st__smoothed_line_4314': float,
     'st__smoothed_line_4319': float,
     'st__smoothed_line_4320': float,
     'st__smoothed_line_4321': float,

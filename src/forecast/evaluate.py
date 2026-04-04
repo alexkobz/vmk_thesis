@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+
+
 def _align_series(y, yhat, weights=None):
     idx = y.index.intersection(yhat.index)
     y = y.loc[idx]
