@@ -24,6 +24,60 @@ from src.forecast.plotting import plot_ticker
 from src.utils import restore_cap, split_multiindex_by_date
 
 
+def _sanitize_exog(
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    var_eps: float = 1e-12,
+    corr_threshold: float = 0.9999,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    X_train = X_train.replace([np.inf, -np.inf], np.nan)
+    X_test = X_test.replace([np.inf, -np.inf], np.nan)
+
+    non_null_cols = X_train.columns[~X_train.isna().all()]
+    X_train = X_train[non_null_cols]
+    X_test = X_test[non_null_cols]
+
+    no_nan_cols = X_train.columns[X_train.notna().all()]
+    X_train = X_train[no_nan_cols]
+    X_test = X_test[no_nan_cols]
+
+    if X_train.shape[1] == 0:
+        return X_train, X_test
+
+    var = X_train.var(axis=0)
+    var_cols = var[(var > var_eps) & var.notna()].index
+    X_train = X_train[var_cols]
+    X_test = X_test[var_cols]
+
+    if X_train.shape[1] <= 1:
+        return X_train, X_test
+
+    dedup_mask = ~X_train.T.duplicated()
+    X_train = X_train.loc[:, dedup_mask]
+    X_test = X_test.loc[:, dedup_mask]
+
+    if 1 < X_train.shape[1] <= 200:
+        corr = X_train.corr().abs()
+        upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+        to_drop = [col for col in upper.columns if (upper[col] > corr_threshold).any()]
+        if to_drop:
+            X_train = X_train.drop(columns=to_drop)
+            X_test = X_test.drop(columns=to_drop)
+
+    return X_train, X_test
+
+
+def _is_arima_model(estimator: object | None, forecaster: object) -> bool:
+    est = estimator
+    if est is None:
+        return False
+    if isinstance(est, str):
+        return est.lower() in {"arima", "sktime_arima", "baseline_arima"}
+    from sktime.forecasting.arima import ARIMA
+
+    return isinstance(est, ARIMA) or isinstance(forecaster, ARIMA)
+
+
 def run_expanding_cv(
     y: pd.DataFrame,
     X: pd.DataFrame,
@@ -53,6 +107,8 @@ def run_expanding_cv(
             logger.info("Fold {fold}: skipped (empty test after alignment)", fold=fold_idx)
             continue
         X_train_m, X_test_m = drop_cap_col(X_train, X_test, cfg.cap_col)
+        if _is_arima_model(cfg.estimator, forecaster):
+            X_train_m, X_test_m = _sanitize_exog(X_train_m, X_test_m)
 
         test_dates = y_test.index.get_level_values("tradedate").unique().sort_values()
         y_train, y_test, X_train_m, X_test_m, secids_keep = filter_secids(

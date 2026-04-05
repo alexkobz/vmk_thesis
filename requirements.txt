@@ -5,6 +5,7 @@ pip
 pytest
 python-dotenv
 ngboost
+pmdarima
 ruff
 scikit-learn
 scipy
