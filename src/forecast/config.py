@@ -12,6 +12,6 @@ class ForecastConfig:
     horizon_days: int = 365
     initial_years: int = 5
     step_days: int = 365
-    ticker: str | None = "AFLT"
+    ticker: str | None = None
     estimator: object | None = None
     pooling: str = "global"

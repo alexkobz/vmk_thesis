@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from loguru import logger
 
+from config.config import ARTIFACTS_DIR
 from src.forecast.artifacts import save_forecaster, save_run_artifacts
 from src.forecast.evaluate import mape_by_secid, wmape
 from src.forecast.config import ForecastConfig
@@ -25,10 +28,10 @@ def run_expanding_cv(
     y: pd.DataFrame,
     X: pd.DataFrame,
     cfg: ForecastConfig,
-    artifacts_dir: str | None = None,
     save_model: bool = True,
     save_metrics: bool = True,
 ) -> dict[str, object]:
+    artifacts_dir = str(ARTIFACTS_DIR)
     logger.info(
         "Forecast CV start: estimator={estimator} pooling={pooling} cap_col={cap_col} ticker={ticker}",
         estimator=type(cfg.estimator).__name__ if cfg.estimator is not None else "default",
@@ -79,12 +82,14 @@ def run_expanding_cv(
         logger.info("Fold {fold}: wmape={score}", fold=fold_idx, score=score)
 
         if cfg.ticker:
+            save_path = Path(artifacts_dir) / f"{cfg.ticker}_fold{fold_idx}.png"
             plot_ticker(
                 cap_y_test,
                 cap_y_pred,
                 last_mape_by_secid,
                 score,
                 cfg.ticker,
+                save_path=save_path,
             )
 
     result = {
