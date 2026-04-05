@@ -8,7 +8,8 @@ services:
     ports:
       - "8888:8888"
     volumes:
-#      - ./:/home/jovyan/work
       - ../:/home/jovyan/
+      - ../:/home/jovyan/work
     environment:
       - JUPYTER_ENABLE_LAB=yes
+      - PYTHONPATH=/home/jovyan:$(PYTHONPATH)

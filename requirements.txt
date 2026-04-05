@@ -4,6 +4,7 @@ pandas
 pip
 pytest
 python-dotenv
+ngboost
 ruff
 scikit-learn
 scipy
