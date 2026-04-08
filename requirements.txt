@@ -4,9 +4,12 @@ pandas
 pip
 pytest
 python-dotenv
+ngboost
+pmdarima
 ruff
 scikit-learn
 scipy
+seaborn
 sktime
 statsmodels
 tqdm

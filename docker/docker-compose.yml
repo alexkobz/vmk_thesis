@@ -8,7 +8,18 @@ services:
     ports:
       - "8888:8888"
     volumes:
-#      - ./:/home/jovyan/work
       - ../:/home/jovyan/
+      - ../:/home/jovyan/work
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'       # максимум 4 CPU
+          memory: 16G       # максимум 16 GB
+          pids: 500         # максимум 500 процессов
+        reservations:
+          cpus: '2.0'       # гарантировано 2 CPU
+          memory: 8G        # гарантировано 8 GB
+    shm_size: 4g   # важно для numpy/pandas
     environment:
       - JUPYTER_ENABLE_LAB=yes
+      - PYTHONPATH=/home/jovyan:$(PYTHONPATH)
