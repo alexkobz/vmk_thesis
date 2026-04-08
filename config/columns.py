@@ -308,6 +308,7 @@ dtype_dict = {
     'tradedate': str,
     'dailycapitalization': float,
     'is_vacation': float,
+    'issue_cumsum': float,
     'log_returns_dailycapitalization_1': float,
     'log_returns_dailycapitalization_365': float,
     'log_returns_smoothed_capex_revenue_rsbu_1': float,
