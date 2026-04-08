@@ -51,6 +51,19 @@ def _get_folder_path(estimator_base_name: str) -> Path:
     folder_path = config.ARTIFACTS_DIR / folder_name
     return folder_path
 
+def _replace_outliers_with_prev(series, factor=3):
+    """
+    Replace outliers in a Series based on mean ± factor * std
+    with the previous value in the Series.
+    """
+    mean = series.mean()
+    std = series.std()
+    lower = mean - factor * std
+    upper = mean + factor * std
+    outliers = ~series.between(lower, upper)
+    # Replace outliers with previous value
+    series[outliers] = series.where(~outliers).ffill()
+    return series
 
 def prepare_xy(
     df: pd.DataFrame,
@@ -109,11 +122,14 @@ def run_expanding_cv(
 
         logger.info("Fold {fold}: fitting forecaster", fold=fold_idx)
         forecaster.fit(y_train, X_train_m)
+
         logger.info("Fold {fold}: predicting", fold=fold_idx)
         y_pred = forecaster.predict(fh=fh_rel, X=X_test_m)
 
         cap_y_test = restore_cap(y_test.iloc[:, 0], cap0)
         cap_y_pred = restore_cap(y_pred.iloc[:, 0], cap0)
+        cap_y_pred = cap_y_pred.groupby(level=0, group_keys=False).apply(_replace_outliers_with_prev)
+
         if cfg.save_metrics:
             os.makedirs(folder_path, exist_ok=True)
             fold_path = folder_path / f'fold{fold_idx}'

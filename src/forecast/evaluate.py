@@ -22,15 +22,12 @@ def panel_mape(y_true: pd.Series, y_pred: pd.Series, weights: pd.Series, level='
         'yhat': np.asarray(y_pred).ravel(),
         'w': np.asarray(weights).ravel()
     }, index=y_true.index)
-
     mape_by_secid = df.groupby(level=level).apply(
         lambda g: mape(g['y'], g['yhat'])
     )
-
     wmape_overall = wmape(df['y'], df['yhat'], df['w'])
-
     return {
-        'mape': mape_by_secid,
+        'mape': mape_by_secid.to_dict(),
         'wmape': wmape_overall,
     }
 
@@ -54,6 +51,6 @@ def panel_f1(y_true, y_pred, weights, level='secid'):
         sample_weight=df['w']
     )
     return {
-        'f1': f1_by_secid,
+        'f1': f1_by_secid.to_dict(),
         'wf1': f1_weighted_overall,
     }

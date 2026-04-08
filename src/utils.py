@@ -37,7 +37,7 @@ def apply_outlier_filter(s, threshold=3.0, group_level=0):
     return s.groupby(level=group_level).apply(f)
 
 # восстановление капитализации по каждому secid
-def restore_cap(logret_series, cap0_series):
+def restore_cap(logret_series: pd.Series, cap0_series: pd.Series):
     # logret_series: pd.Series с MultiIndex (secid, tradedate)
     # cap0_series: pd.Series с индексом secid
     csum = logret_series.groupby(level='secid').cumsum()
