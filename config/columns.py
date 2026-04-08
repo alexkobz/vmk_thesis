@@ -309,7 +309,7 @@ dtype_dict = {
     'dailycapitalization': float,
     'is_vacation': float,
     'log_returns_dailycapitalization_1': float,
-    'log_returns_dailycapitalization_5': float,
+    'log_returns_dailycapitalization_365': float,
     'log_returns_smoothed_capex_revenue_rsbu_1': float,
     'log_returns_smoothed_capex_revenue_msfo_1': float,
     'log_returns_smoothed_capital_rsbu_1': float,

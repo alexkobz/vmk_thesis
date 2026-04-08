@@ -2,26 +2,39 @@ import numpy as np
 import pandas as pd
 
 
-def split_multiindex_by_date(y, splitter, date_level="tradedate"):
+def detect_outliers(s, threshold=3.0):
     """
-    Глобальный сплит для MultiIndex (secid, tradedate) по датам.
+    Detect outliers in a Series using z-score.
 
-    splitter: любой sktime splitter (например, ExpandingWindowSplitter),
-    применяемый к шаблонному одномерному индексу дат.
-    Возвращает генератор (train_iloc, test_iloc) для y.
+    Parameters:
+        s (pd.Series): Input Series (can be MultiIndex)
+        threshold (float): Z-score threshold
+
+    Returns:
+        pd.Series: Boolean mask where True indicates an outlier
     """
-    if not isinstance(y.index, pd.MultiIndex):
-        raise ValueError("y must have a MultiIndex")
-    if date_level not in y.index.names:
-        raise ValueError(f"date level '{date_level}' not in y.index.names")
+    mean = s.mean()
+    std = s.std()
+    mask = (s - mean).abs() > threshold * std
+    return mask
 
-    dates = y.index.get_level_values(date_level)
-    template = pd.Index(dates.unique()).sort_values()
+def apply_outlier_filter(s, threshold=3.0, group_level=0):
+    """
+    Replace outliers with previous value (forward fill) per group.
 
-    for train_dates, test_dates in splitter.split_loc(template):
-        train_mask = dates.isin(train_dates)
-        test_mask = dates.isin(test_dates)
-        yield np.flatnonzero(train_mask), np.flatnonzero(test_mask)
+    Parameters:
+        s (pd.Series): Input Series (can be MultiIndex)
+        threshold (float): Z-score threshold
+        group_level (int or str): Level of MultiIndex to group by
+
+    Returns:
+        pd.Series: Series with outliers replaced by previous value
+    """
+    def f(group):
+        mask = detect_outliers(group, threshold)
+        return group.mask(mask).ffill().bfill()
+
+    return s.groupby(level=group_level).apply(f)
 
 # восстановление капитализации по каждому secid
 def restore_cap(logret_series, cap0_series):

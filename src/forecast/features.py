@@ -24,15 +24,13 @@ def _get_feature_names(fitted_params):
     return [f"f{i}" for i in range(n)]
 
 
-def get_feature_importances(obj) -> pd.Series:
-    if isinstance(obj, dict) and "forecaster" in obj:
-        forecaster = obj["forecaster"]
-    else:
-        forecaster = obj
+def get_feature_importances(forecaster) -> pd.Series:
 
     fp = forecaster.get_fitted_params(deep=True)
-    rf = fp["estimator"]
-    feat_names = _get_feature_names(fp)
+    if fp['estimator__feature_importances']:
+        rf = fp["estimator"]
+        feat_names = _get_feature_names(fp)
 
-    fi = pd.Series(rf.feature_importances_, index=feat_names).sort_values(ascending=False)
-    return fi
+        fi = pd.Series(rf.feature_importances_, index=feat_names).sort_values(ascending=False)
+        return fi
+    return pd.Series()

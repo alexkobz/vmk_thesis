@@ -11,11 +11,31 @@ from src.forecast.config import ForecastConfig
 def build_cv(cfg: ForecastConfig) -> ExpandingWindowSplitter:
     fh = np.arange(1, cfg.horizon_days + 1)
     return ExpandingWindowSplitter(
-        initial_window=cfg.horizon_days * cfg.initial_years,
-        step_length=cfg.step_days,
+        initial_window=cfg.initial_window,
+        step_length=cfg.step_length,
         fh=fh,
     )
 
+def split_multiindex_by_date(y, splitter, date_level="tradedate"):
+    """
+    Глобальный сплит для MultiIndex (secid, tradedate) по датам.
+
+    splitter: любой sktime splitter (например, ExpandingWindowSplitter),
+    применяемый к шаблонному одномерному индексу дат.
+    Возвращает генератор (train_iloc, test_iloc) для y.
+    """
+    if not isinstance(y.index, pd.MultiIndex):
+        raise ValueError("y must have a MultiIndex")
+    if date_level not in y.index.names:
+        raise ValueError(f"date level '{date_level}' not in y.index.names")
+
+    dates = y.index.get_level_values(date_level)
+    template = pd.Index(dates.unique()).sort_values()
+
+    for train_dates, test_dates in splitter.split_loc(template):
+        train_mask = dates.isin(train_dates)
+        test_mask = dates.isin(test_dates)
+        yield np.flatnonzero(train_mask), np.flatnonzero(test_mask)
 
 def split_fold(
     y: pd.DataFrame,
@@ -36,10 +56,12 @@ def align_test_indices(
     return y_test.loc[common_idx], X_test.loc[common_idx]
 
 
+
+
 def drop_cap_col(
     X_train: pd.DataFrame,
     X_test: pd.DataFrame,
-    cap_col: str,
+    cap_col: str = 'dailycapitalization',
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     return X_train.drop(columns=[cap_col]), X_test.drop(columns=[cap_col])
 
@@ -81,7 +103,7 @@ def build_relative_fh(test_dates: pd.Index) -> ForecastingHorizon:
 def get_initial_cap(
     X_test: pd.DataFrame,
     secids_keep: pd.Index,
-    cap_col: str,
+    cap_col: str = 'dailycapitalization',
 ) -> pd.Series:
     return (
         X_test.loc[pd.IndexSlice[secids_keep, :], cap_col]

@@ -1,66 +1,60 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import f1_score
 
+def mape(y_true, y_pred, eps=1e-8):
+    return np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), eps, None)))
 
-def _align_series(y, yhat, weights=None):
-    idx = y.index.intersection(yhat.index)
-    y = y.loc[idx]
-    yhat = yhat.loc[idx]
-    if weights is None:
-        return y, yhat, None
-    w = weights.loc[idx]
-    return y, yhat, w
+def wmape(y_true, y_pred, weights, eps=1e-8):
+    return np.sum(weights * np.abs(y_true - y_pred)) / np.sum(weights * np.abs(y_true))
 
+def sign_f1(y_true, y_pred, average='macro', sample_weight=None):
+    y_true_cls = np.sign(y_true)
+    y_pred_cls = np.sign(y_pred)
+    return f1_score(y_true_cls, y_pred_cls, average=average, sample_weight=sample_weight, zero_division=0)
 
-def mape_by_secid(y, yhat, eps=1e-6, max_ape=10.0):
-    """
-    Robust MAPE per secid with safeguards:
-    - aligns indices
-    - drops non-finite values
-    - uses max(|y|, eps) in denominator
-    - caps pointwise APE by max_ape to reduce anomalies
-    """
-    y, yhat, _ = _align_series(y, yhat, None)
-    df = pd.DataFrame({"y": y, "yhat": yhat})
-    df = df.replace([np.inf, -np.inf], np.nan).dropna()
+def panel_mape(y_true: pd.Series, y_pred: pd.Series, weights: pd.Series, level='secid'):
+    y_true, y_pred = y_true.align(y_pred, join='inner')
+    y_true, weights = y_true.align(weights, join='inner')
 
-    def _mape(s):
-        yv = s["y"].to_numpy()
-        yh = s["yhat"].to_numpy()
-        denom = np.maximum(np.abs(yv), eps)
-        ape = np.abs(yv - yh) / denom
-        ape = np.minimum(ape, max_ape)
-        return float(np.mean(ape)) if len(ape) else np.nan
+    df = pd.DataFrame({
+        'y': np.asarray(y_true).ravel(),
+        'yhat': np.asarray(y_pred).ravel(),
+        'w': np.asarray(weights).ravel()
+    }, index=y_true.index)
 
-    return df.groupby(level="secid").apply(_mape)
+    mape_by_secid = df.groupby(level=level).apply(
+        lambda g: mape(g['y'], g['yhat'])
+    )
 
+    wmape_overall = wmape(df['y'], df['yhat'], df['w'])
 
-def wmape(y, yhat, weights=None, eps=1e-6, max_ape=10.0):
-    """
-    Robust WMAPE:
-    - aligns indices
-    - drops non-finite values
-    - uses abs(y) in denominator
-    - caps pointwise APE by max_ape
-    """
-    y, yhat, w = _align_series(y, yhat, weights)
-    df = pd.DataFrame({"y": y, "yhat": yhat})
-    if w is not None:
-        df["w"] = w
-    df = df.replace([np.inf, -np.inf], np.nan).dropna()
+    return {
+        'mape': mape_by_secid,
+        'wmape': wmape_overall,
+    }
 
-    yv = df["y"].to_numpy()
-    yh = df["yhat"].to_numpy()
-    denom = np.maximum(np.abs(yv), eps)
-    ape = np.abs(yv - yh) / denom
-    ape = np.minimum(ape, max_ape)
+def panel_f1(y_true: pd.Series, y_pred: pd.Series, weights: pd.Series, level='secid'):
+    y_true, y_pred = y_true.align(y_pred, join='inner')
+    y_true, weights = y_true.align(weights, join='inner')
 
-    if w is None:
-        return float(np.sum(ape * denom) / np.sum(denom)) if len(ape) else np.nan
+    df = pd.DataFrame({
+        'y': np.asarray(y_true).ravel(),
+        'yhat': np.asarray(y_pred).ravel(),
+        'w': np.asarray(weights).ravel()
+    }, index=y_true.index)
 
-    wv = df["w"].to_numpy()
-    wv = np.maximum(wv, 0.0)
-    w_denom = wv * denom
-    if np.sum(w_denom) <= 0:
-        return np.nan
-    return float(np.sum(wv * ape * denom) / np.sum(w_denom))
+    f1_by_secid = df.groupby(level=level).apply(
+        lambda g: sign_f1(g['y'], g['yhat'], average='macro')
+    )
+
+    f1_weighted_overall = sign_f1(
+        df['y'], df['yhat'],
+        average='macro',
+        sample_weight=df['w']
+    )
+
+    return {
+        'f1': f1_by_secid,
+        'wf1': f1_weighted_overall,
+    }
