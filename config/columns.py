@@ -310,7 +310,7 @@ dtype_dict = {
     'is_vacation': float,
     'issue_cumsum': float,
     'log_returns_dailycapitalization_1': float,
-    'log_returns_dailycapitalization_365': float,
+    'log_returns_dailycapitalization_30': float,
     'log_returns_smoothed_capex_revenue_rsbu_1': float,
     'log_returns_smoothed_capex_revenue_msfo_1': float,
     'log_returns_smoothed_capital_rsbu_1': float,

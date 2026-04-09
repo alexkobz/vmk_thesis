@@ -14,7 +14,7 @@ from loguru import logger
 from config import config
 from src.forecast.artifacts import serialize_model
 from src.forecast.evaluate import panel_mape, panel_f1
-from src.forecast.config import ForecastConfig
+from src.forecast.config import ForecastConfig, EstimatorType
 from src.forecast.cv import (
     align_test_indices,
     build_cv,
@@ -68,11 +68,10 @@ def _replace_outliers_with_prev(series, factor=3):
 def prepare_xy(
     df: pd.DataFrame,
     y_name: str = "log_returns_dailycapitalization_1",
-    y_alias: str = "log_return",
     drop_cols: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     drop = [y_name, *drop_cols]
-    y = df[y_name].to_frame(y_alias)
+    y = df[y_name].to_frame()
     X = df.drop(columns=drop)
     return y, X
 
@@ -117,7 +116,6 @@ def run_expanding_cv(
         if len(secids_keep) == 0:
             logger.info("Fold {fold}: skipped (no secids kept)", fold=fold_idx)
             continue
-        cap0 = get_initial_cap(X_test, secids_keep)
         fh_rel = build_relative_fh(test_dates)
 
         logger.info("Fold {fold}: fitting forecaster", fold=fold_idx)
@@ -125,10 +123,16 @@ def run_expanding_cv(
 
         logger.info("Fold {fold}: predicting", fold=fold_idx)
         y_pred = forecaster.predict(fh=fh_rel, X=X_test_m)
-
-        cap_y_test = restore_cap(y_test.iloc[:, 0], cap0)
-        cap_y_pred = restore_cap(y_pred.iloc[:, 0], cap0)
-        cap_y_pred = cap_y_pred.groupby(level=0, group_keys=False).apply(_replace_outliers_with_prev)
+        if cfg.estimator_type == EstimatorType.TREE:
+            cap0 = get_initial_cap(X_test, secids_keep)
+            cap_y_test = restore_cap(y_test.iloc[:, 0], cap0)
+            cap_y_pred = restore_cap(y_pred.iloc[:, 0], cap0)
+            cap_y_pred = cap_y_pred.groupby(level=0, group_keys=False).apply(_replace_outliers_with_prev)
+        elif cfg.estimator_type == EstimatorType.LINEAR:
+            cap_y_test = y_test.iloc[:, 0]
+            cap_y_pred = y_pred.iloc[:, 0]
+        else:
+            raise NotImplementedError
 
         if cfg.save_metrics:
             os.makedirs(folder_path, exist_ok=True)
@@ -142,6 +146,7 @@ def run_expanding_cv(
 
             metrics = {
                 'config': cfg_dict,
+                'X': X_test_m.columns.tolist(),
                 **mapes,
                 **f1s,
             }

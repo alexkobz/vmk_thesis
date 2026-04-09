@@ -56,13 +56,13 @@ def align_test_indices(
     return y_test.loc[common_idx], X_test.loc[common_idx]
 
 
-
-
 def drop_cap_col(
     X_train: pd.DataFrame,
     X_test: pd.DataFrame,
     cap_col: str = 'dailycapitalization',
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if cap_col not in X_train.columns:
+        return X_train, X_test
     return X_train.drop(columns=[cap_col]), X_test.drop(columns=[cap_col])
 
 

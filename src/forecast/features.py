@@ -27,7 +27,7 @@ def _get_feature_names(fitted_params):
 def get_feature_importances(forecaster) -> pd.Series:
 
     fp = forecaster.get_fitted_params(deep=True)
-    if fp['estimator__feature_importances']:
+    if fp.get('estimator__feature_importances') is not None:
         rf = fp["estimator"]
         feat_names = _get_feature_names(fp)
 
