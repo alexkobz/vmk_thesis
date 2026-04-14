@@ -1,36 +1,69 @@
 import pandas as pd
+from matplotlib import pyplot as plt
+from sklearn.inspection import permutation_importance
+
+from src.forecast import ForecastConfig, EstimatorType
+from src.forecast.evaluate import scorer
 
 
-def _find_feature_name_provider(fitted_params):
-    for v in fitted_params.values():
-        if hasattr(v, "get_feature_names_out") or hasattr(v, "feature_names_out_"):
-            return v
-    return None
-
-
-def _get_feature_names(fitted_params):
-    provider = _find_feature_name_provider(fitted_params)
-    if provider is not None:
-        if hasattr(provider, "get_feature_names_out"):
-            return list(provider.get_feature_names_out())
-        return list(provider.feature_names_out_)
-
-    est = fitted_params.get("estimator")
-    if est is not None and hasattr(est, "feature_names_in_"):
-        if len(est.feature_names_in_) == len(est.feature_importances_):
-            return list(est.feature_names_in_)
-
-    n = len(fitted_params["estimator"].feature_importances_)
-    return [f"f{i}" for i in range(n)]
-
-
-def get_feature_importances(forecaster) -> pd.Series:
+def get_feature_importances(forecaster, cfg: ForecastConfig, cols: list[str]) -> pd.Series:
 
     fp = forecaster.get_fitted_params(deep=True)
-    if fp.get('estimator__feature_importances') is not None:
-        rf = fp["estimator"]
-        feat_names = _get_feature_names(fp)
 
-        fi = pd.Series(rf.feature_importances_, index=feat_names).sort_values(ascending=False)
-        return fi
+    if fp.get('estimator') is not None:
+        fil = fp.get('estimator').feature_importances_[0]
+        fis = fp.get('estimator').feature_importances_[1]
+        if cfg.estimator_type == EstimatorType.NGBOOST:
+            pass
+        features = pd.DataFrame({
+            'feature': cols,
+            'importance_mean': fil,
+            'importance_std': fis,
+        }).sort_values('importance_mean', ascending=False).iloc[:20]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        fig.suptitle("Feature Importance", fontsize=16)
+        ax.bar(features['feature'], features['importance_mean'], yerr=features['importance_std'], capsize=5,
+               color='skyblue')
+        ax.set_xlabel("Feature", fontsize=12)
+        ax.set_ylabel("Mean", fontsize=12)
+        ax.set_xticklabels(features['feature'], rotation=45, ha='right')
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.show()
+        return pd.Series(features['importance_mean'], index=features['feature']).sort_values(ascending=False)
     return pd.Series()
+
+def get_permutation_importances(
+    forecaster,
+    X_test,
+    y_test,
+    scoring=scorer,
+):
+    res = permutation_importance(
+        forecaster.estimator_,  # fitted sklearn-like estimator
+        X_test,
+        y_test,
+        scoring=scorer,
+        n_repeats=10,
+        random_state=42,
+        n_jobs=1,  # safer for complex objects
+    )
+    features = pd.DataFrame({
+        'feature': X_test.columns,
+        'importance_mean': res.importances_mean,
+        'importance_std': res.importances_std,
+    }).sort_values('importance_mean', ascending=False).iloc[:20]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.suptitle("Permutation Feature Importance (IC)", fontsize=16)
+    ax.bar(features['feature'], features['importance_mean'], yerr=features['importance_std'], capsize=5,
+           color='skyblue')
+    ax.set_xlabel("Feature", fontsize=12)
+    ax.set_ylabel("Mean Decrease in IC", fontsize=12)
+    ax.set_xticklabels(features['feature'], rotation=45, ha='right')
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+    return pd.Series(res.importances_mean, index=X_test.columns).sort_values(ascending=False)
+

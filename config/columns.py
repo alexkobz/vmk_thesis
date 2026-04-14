@@ -811,3 +811,13 @@ dtype_dict = {
     'st__smoothed_line_6330': float,
     'st__smoothed_line_6350': float,
 }
+
+base_cols = [
+    'secid',
+    'tradedate',
+    'dailycapitalization',
+    'is_vacation',
+    'issue_cumsum',
+    'log_returns_dailycapitalization_1',
+    'log_returns_dailycapitalization_30',
+]

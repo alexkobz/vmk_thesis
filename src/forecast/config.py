@@ -1,21 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, Optional
+
+import pandas as pd
 
 
 class EstimatorType(str, Enum):
     LINEAR = "LINEAR"
     TREE = "TREE"
+    NGBOOST = "NGBOOST"
+
 
 @dataclass(frozen=True)
 class ForecastConfig:
-    estimator: object | None = None
+    """Configuration for forecasting runs.
+
+    estimator can be provided directly (an instantiated estimator), or by name using
+    """
+
+    estimator: Any | None = None
     estimator_type: EstimatorType = EstimatorType.TREE
-    pooling: str = "global"
-    initial_window: int = 365 * 5
-    horizon_days: int = 365
-    step_length: int = 365
-    ticker: str | None = None
+    y: pd.Series | pd.DataFrame | None = None
+    X: pd.Series | pd.DataFrame | None = None
+    ticker: Optional[str] = None
     save_model: bool = True
     save_metrics: bool = True

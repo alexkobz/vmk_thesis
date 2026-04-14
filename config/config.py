@@ -15,13 +15,3 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 TEMPORARY_DATA_DIR = DATA_DIR / "temporary"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 ARTIFACTS_DIR = DATA_DIR / "artifacts"
-
-# If tqdm is installed, configure loguru with tqdm.write
-# https://github.com/Delgan/loguru/issues/135
-try:
-    from tqdm import tqdm
-
-    logger.remove(0)
-    logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True)
-except ModuleNotFoundError:
-    pass

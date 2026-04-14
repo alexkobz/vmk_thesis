@@ -10,16 +10,45 @@ services:
     volumes:
       - ../:/home/jovyan/
       - ../:/home/jovyan/work
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'       # максимум 4 CPU
-          memory: 16G       # максимум 16 GB
-          pids: 500         # максимум 500 процессов
-        reservations:
-          cpus: '2.0'       # гарантировано 2 CPU
-          memory: 8G        # гарантировано 8 GB
-    shm_size: 4g   # важно для numpy/pandas
+    shm_size: 4g
     environment:
       - JUPYTER_ENABLE_LAB=yes
-      - PYTHONPATH=/home/jovyan:$(PYTHONPATH)
+      - PYTHONPATH=/home/jovyan
+#    depends_on:
+#      - mlflow
+#    networks:
+#      - mlflow-net
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow-server
+    ports:
+      - "5005:5000"
+    volumes:
+      - ../mlruns:/mlruns
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlruns/mlflow.db
+      --default-artifact-root mlflow-artifacts:/
+      --host 0.0.0.0
+      --port 5000
+
+#  db:
+#    image: postgres:15
+#    container_name: postgres
+#    environment:
+#      POSTGRES_USER: admin
+#      POSTGRES_PASSWORD: admin
+#      POSTGRES_DB: public
+#    ports:
+#      - "5432:5432"
+#    volumes:
+#      - vmk_thesis:/var/lib/postgresql/data
+#
+#volumes:
+#  vmk_thesis:
+#    external: true
+
+networks:
+  mlflow-net:
+    driver: bridge
