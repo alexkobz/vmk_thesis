@@ -2,6 +2,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.inspection import permutation_importance
 
+from config import config
 from src.forecast import ForecastConfig, EstimatorType
 from src.forecast.evaluate import scorer
 
@@ -30,6 +31,7 @@ def get_feature_importances(forecaster, cfg: ForecastConfig, cols: list[str]) ->
         ax.set_xticklabels(features['feature'], rotation=45, ha='right')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
+        plt.savefig(config.DATA_DIR / 'artifacts' / 'fi.png')
         plt.show()
         return pd.Series(features['importance_mean'], index=features['feature']).sort_values(ascending=False)
     return pd.Series()
@@ -64,6 +66,7 @@ def get_permutation_importances(
     ax.set_xticklabels(features['feature'], rotation=45, ha='right')
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
+    plt.savefig(config.DATA_DIR / 'artifacts' / 'pfi.png')
     plt.show()
     return pd.Series(res.importances_mean, index=X_test.columns).sort_values(ascending=False)
 

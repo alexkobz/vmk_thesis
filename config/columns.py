@@ -813,11 +813,37 @@ dtype_dict = {
 }
 
 base_cols = [
-    'secid',
-    'tradedate',
     'dailycapitalization',
     'is_vacation',
     'issue_cumsum',
     'log_returns_dailycapitalization_1',
     'log_returns_dailycapitalization_30',
+]
+
+feat_cols = [
+    'dailycapitalization',
+    'is_vacation',
+    'issue_cumsum',
+    'log_returns_dailycapitalization_1',
+    'log_returns_dailycapitalization_30',
+    'log_returns_smoothed_debt_equity_rsbu_1',
+    'log_returns_smoothed_debt_ratio_msfo_1',
+    'log_returns_smoothed_gross_margin_msfo_1',
+    'log_returns_smoothed_line_1240_1',
+    'log_returns_smoothed_line_1340_1',
+    'log_returns_smoothed_line_1360_1',
+    'log_returns_smoothed_line_2500_1',
+    'log_returns_smoothed_line_3100_1',
+    'log_returns_smoothed_line_3210_1',
+    'log_returns_smoothed_line_4223_1',
+    'log_returns_smoothed_operation_margin_msfo_1',
+    'log_returns_smoothed_pcf_msfo_1',
+    'st__smoothed_interest_coverage_msfo',
+    'st__smoothed_line_4200',
+    'st__smoothed_pbv_msfo',
+    'st__smoothed_pcf_msfo',
+    'st__smoothed_pfcf_rsbu',
+    'st__smoothed_roa_msfo',
+    'st__smoothed_roce_rsbu',
+    'st__smoothed_roe_rsbu',
 ]
