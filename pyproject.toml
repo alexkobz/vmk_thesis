@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vmk_thesis"
+version = "0.1.0"
+requires-python = ">=3.12"
+description = "Project for my thesis work: Application of Machine Learning Techniques for Evaluating the Financial Health of Companies"
+authors = [
+    { name="Alexander", email="alexanderkobzarrr@email.com" }
+]
+readme = "README.md"
+
+dependencies = [
+    "loguru",
+    "mkdocs",
+    "mlflow",
+    "ngboost",
+    "pandas",
+    "pip",
+    "pytest",
+    "python-dotenv",
+    "scikit-learn",
+    "scipy",
+    "seaborn",
+    "sktime",
+    "statsmodels",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
