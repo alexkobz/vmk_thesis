@@ -1,5 +1,5 @@
 import pandas as pd
-from config import config
+from config import catalog
 from config import columns
 from loguru import logger
 

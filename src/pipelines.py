@@ -6,23 +6,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, OneHotEncoder, StandardScaler
 
-from config.columns import boards, cat_cols, index, lines, mults, types, y_name
-from src.steps.process import (
-    add_log_returns,
-    categorize,
-    drop_additional_issues,
-    ffill_bfill,
-    filter_boards,
-    filter_types,
-    filter_years,
-    filter_zero_target,
-    gather_secids,
-    replace_target,
-    replace_zeros_with_nan,
-    set_index,
-    fill_days,
-)
-from src.steps.smoothing import lowess_smooth
 
 def _describe_shape(obj: object) -> str:
     try:
@@ -81,10 +64,10 @@ def build_prep_pipeline() -> Pipeline:
             ("set_index", FunctionTransformer(_wrap_step("set_index", set_index), kw_args={"index": index, "y_name": y_name}, validate=False)),
             ("fill_days", FunctionTransformer(_wrap_step("fill_days", fill_days), validate=False)),
             ("ffill_bfill", FunctionTransformer(_wrap_step("ffill_bfill", ffill_bfill), validate=False)),
-            ("add_log_returns_cap1", FunctionTransformer(_wrap_step("add_log_returns_cap1", add_log_returns), kw_args={"col": y_name, "lags": [1]}, validate=False)),
-            ("add_log_returns_close", FunctionTransformer(_wrap_step("add_log_returns_close", add_log_returns), kw_args={"col": "close", "lags": [1]}, validate=False)),
+            # ("add_log_returns_cap1", FunctionTransformer(_wrap_step("add_log_returns_cap1", add_log_returns), kw_args={"col": y_name, "lags": [1]}, validate=False)),
+            # ("add_log_returns_close", FunctionTransformer(_wrap_step("add_log_returns_close", add_log_returns), kw_args={"col": "close", "lags": [1]}, validate=False)),
             ("replace_target", FunctionTransformer(_wrap_step("replace_target", replace_target), kw_args={"y_name": y_name}, validate=False)),
-            ("add_log_returns_cap5", FunctionTransformer(_wrap_step("add_log_returns_cap5", add_log_returns), kw_args={"col": y_name, "lags": [5]}, validate=False)),
+            # ("add_log_returns_cap5", FunctionTransformer(_wrap_step("add_log_returns_cap5", add_log_returns), kw_args={"col": y_name, "lags": [5]}, validate=False)),
             ("filter_years", FunctionTransformer(_wrap_step("filter_years", filter_years), validate=False)),
             ("filter_zero_target", FunctionTransformer(_wrap_step("filter_zero_target", filter_zero_target), kw_args={"y_name": y_name}, validate=False)),
         ]

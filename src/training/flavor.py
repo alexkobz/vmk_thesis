@@ -1,6 +1,6 @@
 """The ``flavor`` module provides an example for a custom model flavor for ``sktime`` library.
 
-This module exports ``sktime`` models in the following formats:
+This module exports ``sktime`` training in the following formats:
 
 sktime (native) format
     This is the main flavor that can be loaded back into ``sktime``, which relies on pickle
@@ -172,19 +172,19 @@ def save_model(
         A list of local filesystem paths to Python file dependencies (or directories
         containing file dependencies). These files are *prepended* to the system path
         when the model is loaded.
-    mlflow_model: mlflow.models.Model, optional (default=None)
-        mlflow.models.Model configuration to which to add the python_function flavor.
-    signature : mlflow.models.signature.ModelSignature, optional (default=None)
-        Model Signature mlflow.models.ModelSignature describes
+    mlflow_model: mlflow.training.Model, optional (default=None)
+        mlflow.training.Model configuration to which to add the python_function flavor.
+    signature : mlflow.training.signature.ModelSignature, optional (default=None)
+        Model Signature mlflow.training.ModelSignature describes
         model input and output :py:class:`Schema <mlflow.types.Schema>`. The model
-        signature can be :py:func:`inferred <mlflow.models.infer_signature>` from
+        signature can be :py:func:`inferred <mlflow.training.infer_signature>` from
         datasets with valid model input (e.g. the training dataset with target column
         omitted) and valid model output (e.g. model predictions generated on the
         training dataset), for example:
 
         .. code-block:: py
 
-          from mlflow.models import infer_signature
+          from mlflow.training import infer_signature
 
           train = df.drop_column("target_label")
           predictions = ...  # compute model predictions
@@ -318,17 +318,17 @@ def log_model(
     registered_model_name : str, optional (default=None)
         If given, create a model version under ``registered_model_name``, also creating
         a registered model if one with the given name does not exist.
-    signature : mlflow.models.signature.ModelSignature, optional (default=None)
-        Model Signature mlflow.models.ModelSignature describes
+    signature : mlflow.training.signature.ModelSignature, optional (default=None)
+        Model Signature mlflow.training.ModelSignature describes
         model input and output :py:class:`Schema <mlflow.types.Schema>`. The model
-        signature can be :py:func:`inferred <mlflow.models.infer_signature>` from
+        signature can be :py:func:`inferred <mlflow.training.infer_signature>` from
         datasets with valid model input (e.g. the training dataset with target column
         omitted) and valid model output (e.g. model predictions generated on the
         training dataset), for example:
 
         .. code-block:: py
 
-          from mlflow.models import infer_signature
+          from mlflow.training import infer_signature
 
           train = df.drop_column("target_label")
           predictions = ...  # compute model predictions
@@ -363,11 +363,11 @@ def log_model(
         The format in which to serialize the model. This should be one of the formats
         "pickle" or "cloudpickle"
     kwargs:
-        Additional arguments for :py:class:`mlflow.models.model.Model`
+        Additional arguments for :py:class:`mlflow.training.model.Model`
 
     Returns
     -------
-    A :py:class:`ModelInfo <mlflow.models.model.ModelInfo>` instance that contains the
+    A :py:class:`ModelInfo <mlflow.training.model.ModelInfo>` instance that contains the
     metadata of the logged model.
     """
     return Model.log(
