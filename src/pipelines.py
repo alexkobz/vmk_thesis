@@ -1,115 +1,125 @@
 from __future__ import annotations
 
-import pandas as pd
-from loguru import logger
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, OneHotEncoder, StandardScaler
 
-
-def _describe_shape(obj: object) -> str:
-    try:
-        shape = obj.shape
-    except AttributeError:
-        return "shape=unknown"
-    return f"shape={shape}"
-
-
-def _wrap_step(step_name: str, fn):
-    def _wrapped(df, *args, **kwargs):
-        logger.info("Step {step}: start ({shape})", step=step_name, shape=_describe_shape(df))
-        out = fn(df, *args, **kwargs)
-        logger.info("Step {step}: end ({shape})", step=step_name, shape=_describe_shape(out))
-        return out
-
-    return _wrapped
+from logs.logger import logger
+from src.data_processing import (
+    filter_boards, drop_additional_issues, filter_null_cols, categorize,
+    gather_secids, replace_zeros_with_nan, set_index, fill_periods, ffill_bfill,
+    filter_years, filter_secids,
+)
+from src.feature_engineering import (
+    add_log_returns, lowess_smooth
+)
+from utils.read_yaml import *
 
 
-def _add_lr_for_col(df: pd.DataFrame, col: str) -> pd.DataFrame:
-    out = add_log_returns(df, col, [1])
-    return out[[f"log_returns_{col}_1"]]
+def build_data_processing_pipeline() -> Pipeline:
+
+    return Pipeline([
+        ("filter_boards", FunctionTransformer(
+            filter_boards,
+            kw_args={
+                "boards": dp['filter_boards']['boards']
+            })
+        ),
+        ("drop_additional_issues", FunctionTransformer(
+            drop_additional_issues,
+            kw_args={
+                "by": dp['drop_additional_issues']['by'],
+                "template": dp['drop_additional_issues']['template']
+            })
+        ),
+        ("filter_null_cols", FunctionTransformer(
+            filter_null_cols,
+            kw_args={
+                "cols": mults + lines
+            })
+        ),
+        ("categorize", FunctionTransformer(
+            categorize,
+            kw_args={
+                "cols": dp['categorize']['cols'],
+            })
+        ),
+        ("gather_secids", FunctionTransformer(
+            gather_secids,
+            kw_args={
+            })
+        ),
+        ("replace_zeros_with_nan", FunctionTransformer(
+            replace_zeros_with_nan,
+            kw_args={
+            })
+        ),
+        ("set_index", FunctionTransformer(
+            set_index,
+            kw_args={
+                "index_cols": index_cols,
+                "sort_by": dp['set_index']['sort_by'],
+            })
+        ),
+        ("fill_periods", FunctionTransformer(
+            fill_periods,
+            kw_args={
+                "freq": dp['fill_periods']['freq'],
+            })
+        ),
+        ("ffill_bfill", FunctionTransformer(
+            ffill_bfill,
+            kw_args={
+            })
+        ),
+        ("filter_years", FunctionTransformer(
+            filter_years,
+            kw_args={
+                "years": dp['filter_years']['years'],
+            })
+        ),
+        ("filter_secids", FunctionTransformer(
+            filter_secids,
+            kw_args={
+                "num": dp['filter_secids']['num'],
+            })
+        ),
+    ])
 
 
-def _scale_features(df: pd.DataFrame) -> pd.DataFrame:
-    logger.info("Step scale: start ({shape})", shape=_describe_shape(df))
-    smoothed_cols = [c for c in df.columns if c.startswith("smoothed_")]
-    desc = df[smoothed_cols].describe(include="all")
+def build_feature_engineering_pipeline() -> Pipeline:
 
-    cols_minmax = desc.loc["min"][desc.loc["min"] > -1e-6].index.tolist()
-    cols_standard = desc.loc["min"][desc.loc["min"] < -1e-6].index.tolist()
-
-    preprocess = ColumnTransformer(
-        [
-            ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
-            ("mm", MinMaxScaler(), cols_minmax),
-            ("st", StandardScaler(), cols_standard),
-        ],
+    scale_pipeline = ColumnTransformer([
+        ("cat", OneHotEncoder(), fe["one_hot_encode"]["cols"]),
+        ("mm", MinMaxScaler(), fe["min_max_scale"]["cols"]),
+        ("st", StandardScaler(), fe["standard_scale"]["cols"]),
+    ],
         remainder="passthrough",
     )
-    df_sc = preprocess.fit_transform(df)
-    df[preprocess.get_feature_names_out()] = df_sc
-    logger.info("Step scale: end ({shape})", shape=_describe_shape(df))
-    return df
+    scale_pipeline.set_output(transform="pandas")
+
+    feature_engineering_pipeline = Pipeline([
+        ("lowess_smooth", FunctionTransformer(
+            lowess_smooth,
+            kw_args={
+                "cols": mults + lines,
+                "col_prefix": fe['lowess_smooth']['col_prefix'],
+                "frac": fe['lowess_smooth']['frac'],
+            })
+        ),
+
+        scale_pipeline,
+
+        ("add_log_returns", FunctionTransformer(
+            add_log_returns,
+            kw_args={
+                "features": fe['add_log_returns']['features'],
+                "col_prefix": fe['add_log_returns']['col_prefix'],
+            })
+         ),
+    ])
+    return feature_engineering_pipeline
 
 
-def build_prep_pipeline() -> Pipeline:
-    return Pipeline(
-        [
-            ("filter_boards", FunctionTransformer(_wrap_step("filter_boards", filter_boards), kw_args={"boards": boards}, validate=False)),
-            ("drop_additional_issues", FunctionTransformer(_wrap_step("drop_additional_issues", drop_additional_issues), kw_args={"y_name": y_name}, validate=False)),
-            ("categorize", FunctionTransformer(_wrap_step("categorize", categorize), validate=False)),
-            ("filter_types", FunctionTransformer(_wrap_step("filter_types", filter_types), kw_args={"types": types}, validate=False)),
-            ("replace_zeros_with_nan", FunctionTransformer(_wrap_step("replace_zeros_with_nan", replace_zeros_with_nan), validate=False)),
-            ("gather_secids", FunctionTransformer(_wrap_step("gather_secids", gather_secids), validate=False)),
-            ("set_index", FunctionTransformer(_wrap_step("set_index", set_index), kw_args={"index": index, "y_name": y_name}, validate=False)),
-            ("fill_days", FunctionTransformer(_wrap_step("fill_days", fill_days), validate=False)),
-            ("ffill_bfill", FunctionTransformer(_wrap_step("ffill_bfill", ffill_bfill), validate=False)),
-            # ("add_log_returns_cap1", FunctionTransformer(_wrap_step("add_log_returns_cap1", add_log_returns), kw_args={"col": y_name, "lags": [1]}, validate=False)),
-            # ("add_log_returns_close", FunctionTransformer(_wrap_step("add_log_returns_close", add_log_returns), kw_args={"col": "close", "lags": [1]}, validate=False)),
-            ("replace_target", FunctionTransformer(_wrap_step("replace_target", replace_target), kw_args={"y_name": y_name}, validate=False)),
-            # ("add_log_returns_cap5", FunctionTransformer(_wrap_step("add_log_returns_cap5", add_log_returns), kw_args={"col": y_name, "lags": [5]}, validate=False)),
-            ("filter_years", FunctionTransformer(_wrap_step("filter_years", filter_years), validate=False)),
-            ("filter_zero_target", FunctionTransformer(_wrap_step("filter_zero_target", filter_zero_target), kw_args={"y_name": y_name}, validate=False)),
-        ]
-    )
-
-
-def build_full_pipeline() -> Pipeline:
-    cols_for_smooth = [f"log_returns_{y_name}_1"] + mults + lines
-    smoothed_cols = [f"smoothed_{c}" for c in (mults + lines)]
-
-    smooth_ct = ColumnTransformer(
-        [
-            (
-                f"smooth_{col}",
-                FunctionTransformer(_wrap_step(f"smooth_{col}", lowess_smooth), validate=False),
-                [col],
-            )
-            for col in cols_for_smooth
-        ],
-        remainder="passthrough",
-    )
-
-    add_smoothed_lr_ct = ColumnTransformer(
-        [
-            (
-                f"lr_{col}",
-                FunctionTransformer(_wrap_step(f"add_smoothed_lr_{col}", _add_lr_for_col), kw_args={"col": col}, validate=False),
-                [col],
-            )
-            for col in smoothed_cols
-        ],
-        remainder="passthrough",
-    )
-
-    return (
-        Pipeline(
-            [
-                ("prep", build_prep_pipeline()),
-                ("smooth", smooth_ct),
-                ("add_smoothed_lr", add_smoothed_lr_ct),
-                ("scale", FunctionTransformer(_scale_features, validate=False)),
-            ]
-        )
-        .set_output(transform="pandas")
-    )
+def build_training_pipeline() -> Pipeline:
+    return Pipeline([])

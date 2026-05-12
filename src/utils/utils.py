@@ -1,5 +1,8 @@
+from typing import Callable
+
 import numpy as np
 import pandas as pd
+from logs.logger import logger
 
 
 def detect_outliers(s: pd.Series, threshold=3.0):
@@ -71,3 +74,11 @@ def prepare_xy(
     cap = df[cap_col]
     X = df.drop(columns=[y_name, cap_col])
     return y, X, cap
+
+def show_shape(fn: Callable):
+    def _wrapped(df, *args, **kwargs):
+        logger.info("Step {step}: start ({shape})", step=fn.__name____, shape=df.shape)
+        out: pd.DataFrame = fn(df, *args, **kwargs)
+        logger.info("Step {step}: finish ({shape})", step=fn.__name__, shape=out.shape)
+        return out
+    return _wrapped

@@ -1,144 +1,121 @@
 import numpy as np
 import pandas as pd
 
-from src.utils import restore_cap
+from utils.read_yaml import *
+from utils.utils import show_shape
 
 
-def filter_boards(df: pd.DataFrame, boards: set[str]) -> pd.DataFrame:
-    return df[df["boardid"].isin(boards)].copy()
+@show_shape
+def filter_boards(df: pd.DataFrame, boards: list[str]) -> pd.DataFrame:
+    return df[df[boardid].isin(boards)]
 
 
-def drop_additional_issues(df: pd.DataFrame, y_name: str) -> pd.DataFrame:
-    df = df.copy()
-    df["base_secid"] = df["secid"].str.replace(r"-0.*$", "", regex=True)
-
+@show_shape
+def drop_additional_issues(df: pd.DataFrame, by: str | list[str], template: str) -> pd.DataFrame:
+    df["base_secid"] = df[secid].str.replace(rf"{template}", "", regex=True)
     agg = (
-        df.groupby(["base_secid", "tradedate", "boardid"])[y_name]
+        df.groupby(by)[y_name]
         .agg(sumcap="sum", maxcap="max")
         .reset_index()
-        .sort_values(["base_secid", "tradedate", "boardid"])
+        .sort_values(by)
     )
     agg["is_issue"] = (agg["sumcap"] != agg["maxcap"]).astype(int)
     agg["issue_cummax"] = agg.groupby("base_secid")["is_issue"].cummax()
-    agg["issue_cumsum"] = agg.groupby("base_secid")["is_issue"].cumsum()
+    agg[issue_cumsum] = agg.groupby("base_secid")["is_issue"].cumsum()
 
-    out = agg.merge(df, on=["base_secid", "tradedate", "boardid"], how="left")
+    out = agg.merge(df, on=by, how="left")
     out[y_name] = out["sumcap"]
-    return out.copy()
+    return out
 
 
-def filter_null_cols(df: pd.DataFrame, mults: list[str], lines: list[str]) -> pd.DataFrame:
-    cols = mults + lines
+@show_shape
+def filter_null_cols(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     null_tickers = (
-        df.groupby("secid")[cols]
+        df.groupby(secid)[cols]
         .apply(lambda g: g.isna().all().all())
         .pipe(lambda s: s[s].index.tolist())
     )
-    return df[~df["secid"].isin(null_tickers)].copy()
+    return df[~df[secid].isin(null_tickers)]
 
 
-def categorize(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    df["type"] = df["type"].fillna("common_share").astype("category")
-    df["sector"] = df["sector"].fillna("other").astype("category")
+@show_shape
+def categorize(df: pd.DataFrame, cols: dict) -> pd.DataFrame:
+    for col, val in cols.items():
+        df[col] = df[col].fillna(val).astype("category")
     return df
 
 
-def filter_types(df: pd.DataFrame, types: set[str]) -> pd.DataFrame:
-    return df[df["type"].isin(types)].copy()
-
-
-def replace_zeros_with_nan(df: pd.DataFrame) -> pd.DataFrame:
-    return df.replace(0, np.nan).copy()
-
-
+@show_shape
 def gather_secids(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    df["inn"] = df["inn"].str.zfill(10)
+    df[inn] = df[inn].str.zfill(10)
 
     def canonical_secid(group: pd.DataFrame) -> str:
-        min_len = group["secid"].str.len().min()
-        return group[group["secid"].str.len() == min_len]["secid"].iloc[0]
+        min_len = group[secid].str.len().min()
+        return group[group[secid].str.len() == min_len][secid].iloc[0]
 
-    df_common = df[df["type"] == "common_share"].copy()
-    df_preferred = df[df["type"] == "preferred_share"].copy()
+    df_common = df[df[share_type] == 'common_share']
+    df_preferred = df[df[share_type] == 'preferred_share']
 
-    common_map = df_common.groupby("inn").apply(canonical_secid).to_dict()
-    preferred_map = df_preferred.groupby("inn").apply(canonical_secid).to_dict()
+    common_map = df_common.groupby(inn).apply(canonical_secid).to_dict()
+    preferred_map = df_preferred.groupby(inn).apply(canonical_secid).to_dict()
 
-    df_common["secid"] = df_common["inn"].map(common_map)
-    df_preferred["secid"] = df_preferred["inn"].map(preferred_map)
+    df_common[secid] = df_common[inn].map(common_map)
+    df_preferred[secid] = df_preferred[inn].map(preferred_map)
 
-    return pd.concat([df_common, df_preferred], ignore_index=True).copy()
+    return pd.concat([df_common, df_preferred], ignore_index=True)
 
 
-def set_index(df: pd.DataFrame, index: list[str], y_name: str) -> pd.DataFrame:
+@show_shape
+def replace_zeros_with_nan(df: pd.DataFrame) -> pd.DataFrame:
+    return df.replace(0, np.nan)
+
+
+@show_shape
+def set_index(df: pd.DataFrame, index_cols: str | list[str], sort_by: dict[str, bool]) -> pd.DataFrame:
     return (
         df.sort_values(
-            ["secid", "tradedate", "volume", y_name],
-            ascending=[True, True, False, False],
+            list(sort_by.keys()),
+            ascending=list(sort_by.values()),
         )
-        .groupby(index)
+        .groupby(index_cols)
         .first()
-        .copy()
     )
 
 
-def fill_days(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.groupby(level="secid").apply(lambda x: x.droplevel(0).asfreq("D"))
-    df["is_vacation"] = df["year"].isna()
+@show_shape
+def fill_periods(df: pd.DataFrame, freq = 'D') -> pd.DataFrame:
+    df = df.groupby(level=secid).apply(lambda x: x.droplevel(0).asfreq(freq))
+    df[is_vacation] = df[year].isna()
     return df
 
 
+@show_shape
 def ffill_bfill(df: pd.DataFrame) -> pd.DataFrame:
-    return df.groupby(level="secid").ffill().groupby(level="secid").bfill()
+    return df.groupby(level=secid).ffill().groupby(level=secid).bfill()
 
 
-def target_imputer(df: pd.DataFrame, y_name: str) -> pd.DataFrame:
-    df = df.copy()
-    outstanding_shares = df[y_name] / df["close"]
-    mask = df[y_name].isna() & df["close"].notna() & outstanding_shares.notna()
-    df.loc[mask, y_name] = df.loc[mask, "close"] * outstanding_shares
-    df[y_name] = df[y_name].fillna(df[y_name].median())
+@show_shape
+def filter_years(df: pd.DataFrame, years: list[int]) -> pd.DataFrame:
+    return df[df[year].isin(years)]
+
+
+@show_shape
+def filter_secids(df: pd.DataFrame, num: int) -> pd.DataFrame:
+    secid_counts = df.index.get_level_values(0).value_counts()
+    df = df[df.index.get_level_values(0).isin(
+        secid_counts[secid_counts > num].index
+    )]
     return df
 
 
-def add_log_returns(df: pd.DataFrame, col: str, lags: list[int]) -> pd.DataFrame:
-    df = df.copy()
-    s_pos = df[col].astype(float).where(df[col] > 0)
+# def target_imputer(df: pd.DataFrame) -> pd.DataFrame:
+#     outstanding_shares = df[y_name] / df[close]
+#     mask = df[y_name].isna() & df[close].notna() & outstanding_shares.notna()
+#     df.loc[mask, y_name] = df.loc[mask, close] * outstanding_shares
+#     df[y_name] = df[y_name].fillna(df[y_name].median())
+#     return df
 
-    for lag in lags:
-        col_name = f"log_returns_{col}_{lag}"
-        df[col_name] = (
-            s_pos.groupby(level="secid")
-            .apply(lambda x: np.log(x).diff(lag))
-            .reset_index(level=0, drop=True)
-        )
-    return df
-
-
-def replace_target(df: pd.DataFrame, y_name: str) -> pd.DataFrame:
-    s = df.groupby(level="secid")[f"log_returns_{y_name}_1"].sum()
-    secids_zero = s[s == 0].index
-
-    mask = df.index.get_level_values("secid").isin(secids_zero)
-    df.loc[mask, f"log_returns_{y_name}_1"] = df.loc[mask, "log_returns_close_1"]
-
-    cap0 = (
-        df.loc[mask, y_name]
-        .groupby(level="secid")
-        .first()
-        .transform(lambda x: x.fillna(x.mean()))
-    )
-    df.loc[mask, y_name] = restore_cap(df.loc[mask, f"log_returns_{y_name}_1"], cap0)
-    return df
-
-
-def filter_years(df: pd.DataFrame) -> pd.DataFrame:
-    return df[df["year"].notna()]
-
-
-def filter_zero_target(df: pd.DataFrame, y_name: str) -> pd.DataFrame:
-    s = df.groupby(level="secid")[f"log_returns_{y_name}_1"].apply(lambda x: np.abs(x).sum())
-    secids_keep = s[s >= 1e-9].index
-    return df.loc[pd.IndexSlice[secids_keep, :]]
+# def filter_zero_target(df: pd.DataFrame) -> pd.DataFrame:
+#     s = df.groupby(level=secid)[y_log].apply(lambda x: np.abs(x).sum())
+#     secids_keep = s[s >= 1e-9].index
+#     return df.loc[pd.IndexSlice[secids_keep, :]]
