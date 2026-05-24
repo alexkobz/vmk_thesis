@@ -2,68 +2,91 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
+
 from logs.logger import logger
 
 
-def detect_outliers(s: pd.Series, threshold=3.0):
+def clip_cap_outliers(
+    s: pd.Series,
+    max_jump: float = 2.0
+) -> pd.Series:
     """
-    Detect outliers in a Series using z-score.
+    Замена выбросов предыдущим значением.
 
-    Parameters:
-        s (pd.Series): Input Series (can be MultiIndex)
-        threshold (float): Z-score threshold
-
-    Returns:
-        pd.Series: Boolean mask where True indicates an outlier
+    max_jump=2.0:
+    допускается максимум +200% / -200%
+    относительно предыдущего значения.
     """
-    mean = s.mean()
-    std = s.std()
-    mask = (s - mean).abs() > threshold * std
-    return mask
+    s = s.copy()
+    prev = s.shift(1)
+    
+    # относительное изменение
+    rel_change = (s - prev).abs() / (prev.abs() + 1e-8)
+    
+    # выброс
+    outliers = rel_change > max_jump
+    
+    # заменяем предыдущим значением
+    s[outliers] = prev[outliers]
+    
+    return s
 
-def apply_group_outlier_filter(s: pd.Series, threshold=3.0, group_level=0):
-    """
-    Replace outliers with previous value (forward fill) per group.
 
-    Parameters:
-        s (pd.Series): Input Series (can be MultiIndex)
-        threshold (float): Z-score threshold
-        group_level (int or str): Level of MultiIndex to group by
-
-    Returns:
-        pd.Series: Series with outliers replaced by previous value
-    """
-    def f(group):
-        mask = detect_outliers(group, threshold)
-        return group.mask(mask).ffill().bfill()
-
-    return s.groupby(level=group_level).apply(f)
-
-def apply_outlier_filter(s: pd.Series, threshold=3.0, group_level=0):
-    """
-    Replace outliers with previous value (forward fill) per group.
-
-    Parameters:
-        s (pd.Series): Input Series (can be MultiIndex)
-        threshold (float): Z-score threshold
-        group_level (int or str): Level of MultiIndex to group by
-
-    Returns:
-        pd.Series: Series with outliers replaced by previous value
-    """
-
-    mask = detect_outliers(s, threshold)
-    return s.mask(mask).dropna()
-
-# восстановление капитализации по каждому secid
 def restore_cap(logret_series: pd.Series, cap0_series: pd.Series):
-    # logret_series: pd.Series с MultiIndex (secid, tradedate)
-    # cap0_series: pd.Series с индексом secid
+    """
+    восстановление капитализации по каждому secid
+    
+    Parameters
+    ----------
+    logret_series : pd.Series
+        Series с MultiIndex (secid, tradedate)
+    cap0_series : pd.Series
+        Series с индексом secid (начальная капитализация)
+        
+    Returns
+    -------
+    pd.Series
+        Восстановленные значения капитализации
+    """
     csum = logret_series.groupby(level='secid').cumsum()
     # выравниваем cap0 на MultiIndex
     cap0_aligned = logret_series.index.get_level_values('secid').map(cap0_series)
     cap0_aligned = pd.Series(cap0_aligned, index=logret_series.index)
     return cap0_aligned * np.exp(csum)
+
+
+def restore_cap_safe(logret_series: pd.Series, cap0_series: pd.Series) -> pd.Series:
+    """
+    Safe version of restore_cap that handles NaN values.
+    
+    Parameters
+    ----------
+    logret_series : pd.Series
+        Series с MultiIndex (secid, tradedate)
+    cap0_series : pd.Series
+        Series с индексом secid
+        
+    Returns
+    -------
+    pd.Series
+        Восстановленные значения капитализации (NaN for invalid values)
+    """
+    result = restore_cap(logret_series, cap0_series)
+    # Handle any inf or invalid values
+    result = result.replace([np.inf, -np.inf], np.nan)
+    return result
+
+def hard_clip_logret(s, low=-0.2, high=0.2):
+    return s.clip(lower=low, upper=high)
+
+def robust_clip(s, z=6):
+    mu = s.rolling(20, min_periods=1).mean()
+    std = s.rolling(20, min_periods=1).std()
+
+    upper = mu + z * std
+    lower = mu - z * std
+
+    return s.clip(lower=lower, upper=upper)
 
 def prepare_xy(
     df: pd.DataFrame,
@@ -77,8 +100,7 @@ def prepare_xy(
 
 def show_shape(fn: Callable):
     def _wrapped(df, *args, **kwargs):
-        logger.info("Step {step}: start ({shape})", step=fn.__name____, shape=df.shape)
         out: pd.DataFrame = fn(df, *args, **kwargs)
-        logger.info("Step {step}: finish ({shape})", step=fn.__name__, shape=out.shape)
+        logger.info(f"Step {fn.__name__} finished. Shape: ({out.shape})")
         return out
     return _wrapped

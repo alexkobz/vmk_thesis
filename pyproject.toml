@@ -27,3 +27,6 @@ dependencies = [
     "sktime",
     "statsmodels",
 ]
+
+[project.scripts]
+train = "src.training.train:main"

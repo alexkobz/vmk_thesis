@@ -1,80 +1,136 @@
 import mlflow
-import pandas as pd
 import numpy as np
+import pandas as pd
+from sktime.forecasting.compose import YfromX
 
-from sktime.forecasting.base import ForecastingHorizon
-from src import prepare_xy, restore_cap
-from src.forecast.cv import ExpandingWindowYearSplitter, split_fold
-from src.forecast.evaluate import wmape_score, wf1_score, ic_score
+from logs.logger import logger
 from src.training import flavor
-from src.training.run_cfg import ForecastConfig
+from src.training.evaluate import ic_score, wf1_score, wmape_score
+from src.training.ModelConfig import ModelConfig, model_configs
+from src.utils import (
+    ProcessedCsvReader,
+    apply_cli_overrides,
+    build_train_parser,
+    restore_cap,
+    secid,
+    tr,
+    y_name,
+)
+from src.utils.training import (
+    ExpandingWindowYearSplitter,
+    prepare_yfromx_fold,
+    align_y,
+)
+
+METRIC_FNS = {
+    "wmape": wmape_score,
+    "wf1": wf1_score,
+    "ic": ic_score,
+}
 
 
-def main(cfg: ForecastConfig):
+def train(cfg: ModelConfig) -> YfromX:
     """
     Function to train and evaluate a ngboost model
     :param cfg:
+        ModelConfig
     :return:
+        YfromX
     """
-    mlflow.set_tracking_uri("http://localhost:5005/")
-    mlflow.set_experiment("ngboost_base_experiment")
+
+    mlflow.set_tracking_uri(tr['tracking_uri'])
+    mlflow.set_experiment(f"{cfg.run_name}_experiment")
 
     if mlflow.active_run() is not None:
         mlflow.end_run()
 
     with mlflow.start_run(run_name=cfg.run_name) as run:
-        print("tracking:", mlflow.get_tracking_uri())
-        print("run_id:", run.info.run_id)
+        logger.info(f"tracking_uri: {mlflow.get_tracking_uri()}")
+        logger.info(f"run_id: {run.info.run_id}")
 
-        df = cfg.data_reader()
-        y, X, cap = prepare_xy(df)
-        cap0 = cap.groupby(level="secid").first()
+        df = ProcessedCsvReader().read()
+        y = df[cfg.y].fillna(0).to_frame()
+        X = df[cfg.X].fillna(0)
+        cap = df[y_name]
+        cap0 = cap.groupby(level=secid).first()
 
-        model = cfg.model
+        model = YfromX(
+            estimator=cfg.estimator(
+                Base=cfg.Base,
+                Dist=cfg.Dist,
+                n_estimators=cfg.n_estimators,
+                learning_rate=cfg.learning_rate,
+                random_state=cfg.random_state,
+                verbose=cfg.verbose,
+            ),
+            pooling=cfg.pooling,
+        )
         parameters = model.get_params()
         mlflow.log_params(parameters)
 
-        fold_metrics = []
-        splitter = ExpandingWindowYearSplitter(min_train_years=4)
+        splitter = ExpandingWindowYearSplitter(min_train_years=cfg.min_train_years)
+        metrics: list[dict[str, float]] = []
 
         for fold, (train_idx, test_idx) in enumerate(splitter.split(y), 1):
-            y_train, y_test, X_train, X_test = split_fold(y, X, train_idx, test_idx)
+            y_train, y_test, X_train, X_pred, fh = prepare_yfromx_fold(
+                y,
+                X,
+                train_idx,
+                test_idx,
+                secid_level="secid",
+                date_level="tradedate",
+                fill_value=0.0,
+            )
 
-            print(f"Fold {fold}: Y Train shape: {y_train.shape}, Test shape: {y_test.shape}")
-            print(f"Fold {fold}: X Train shape: {X_train.shape}, Test shape: {X_test.shape}")
+            logger.info(f"Fold {fold}: Y Train shape: {y_train.shape}, Test shape: {y_test.shape}")
+            logger.info(f"Fold {fold}: X Train shape: {X_train.shape}, Pred shape: {X_pred.shape}")
 
             model.fit(y_train, X=X_train)
-
-            target_dates = X_test.index.get_level_values("tradedate").unique().sort_values()
-            fh = ForecastingHorizon(target_dates, is_relative=False)
-            y_pred = model.predict(fh=fh, X=X_test)
-
-            y_test = pd.Series(np.asarray(y_test).reshape(-1), index=X_test.index)
-            y_pred = pd.Series(np.asarray(y_pred).reshape(-1), index=X_test.index)
+            y_pred = model.predict(fh=fh, X=X_pred)
+            
+            y_test, y_pred = align_y(y_test, y_pred)
+            # y_pred_clipped = y_pred.clip(-0.05, 0.05)
             y_test_cap = restore_cap(y_test, cap0)
             y_pred_cap = restore_cap(y_pred, cap0)
+            # y_pred_cap = y_pred_cap.groupby(level="secid").transform(
+            #     lambda s: s.clip(s.quantile(0.01), s.quantile(0.99))
+            # )
 
-            fold_wmape = wmape_score(y_test_cap, y_pred_cap)
-            fold_wf1 = wf1_score(y_test, y_pred)
-            fold_ic = ic_score(y_test, y_pred)
+            fold_metrics = {}
+            for m in tr["evaluate"]["metrics"]:
+                name = m["name"]
+                fn = METRIC_FNS[m["function"]]
 
-            fold_metrics.append({"fold": fold, "wmape": fold_wmape, "wf1": fold_wf1, "ic": fold_ic})
+                if m.get("use_cap", False):
+                    y_true, y_pred = y_test_cap, y_pred_cap
+                else:
+                    y_true, y_pred = y_test, y_pred
 
-            mlflow.log_metric("wmape", fold_wmape, step=fold)
-            mlflow.log_metric("wf1", fold_wf1, step=fold)
-            mlflow.log_metric("ic", fold_ic, step=fold)
+                value = fn(y_true, y_pred)
+                fold_metrics[name] = value
+                mlflow.log_metric(name, value, step=fold)
 
-        mlflow.log_metric("wmape_mean", np.mean([m["wmape"] for m in fold_metrics]))
-        mlflow.log_metric("wf1_mean", np.mean([m["wf1"] for m in fold_metrics]))
-        mlflow.log_metric("ic_mean", np.mean([m["ic"] for m in fold_metrics]))
+            metrics.append(fold_metrics)
+
+        for m in tr["evaluate"]["metrics"]:
+            name = m["name"]
+            vals = [r[name] for r in metrics if name in r]
+            if vals:
+                mlflow.log_metric(f"{name}_mean", float(np.mean(vals)))
         flavor.log_model(
             sktime_model=model,
             artifact_path="training",
             serialization_format="pickle",
         )
 
+    logger.info(f"Finished {cfg.run_name}")
     return model
 
+
 if __name__ == "__main__":
-    cfg = ForecastConfig()
-    main(cfg)
+    args = build_train_parser().parse_args()
+    try:
+        cfg = apply_cli_overrides(model_configs[args.model_config], args)
+        train(cfg)
+    except KeyError:
+        logger.info('Invalid model configuration. Please choose from: %s', sorted(model_configs))

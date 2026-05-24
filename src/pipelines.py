@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, OneHotEncoder, StandardScaler
+from sklearn.preprocessing import (FunctionTransformer, MinMaxScaler,
+                                   OneHotEncoder, StandardScaler)
 
-from logs.logger import logger
-from src.data_processing import (
-    filter_boards, drop_additional_issues, filter_null_cols, categorize,
-    gather_secids, replace_zeros_with_nan, set_index, fill_periods, ffill_bfill,
-    filter_years, filter_secids,
-)
-from src.feature_engineering import (
-    add_log_returns, lowess_smooth
-)
-from utils.read_yaml import *
+from src.data_processing import (categorize, drop_additional_issues,
+                                 ffill_bfill, fill_periods, filter_boards,
+                                 filter_null_cols, filter_secids, filter_years,
+                                 gather_secids, replace_zeros_with_nan,
+                                 set_index)
+from src.feature_engineering import add_log_returns, lowess_smooth
+from src.utils import dp, mults, lines, index_cols, fe
 
 
 def build_data_processing_pipeline() -> Pipeline:
@@ -89,14 +87,20 @@ def build_data_processing_pipeline() -> Pipeline:
 
 def build_feature_engineering_pipeline() -> Pipeline:
 
-    scale_pipeline = ColumnTransformer([
-        ("cat", OneHotEncoder(), fe["one_hot_encode"]["cols"]),
+    scale_transformer = ColumnTransformer([
+        ("cat", OneHotEncoder(sparse_output=False), fe["one_hot_encode"]["cols"]),
         ("mm", MinMaxScaler(), fe["min_max_scale"]["cols"]),
         ("st", StandardScaler(), fe["standard_scale"]["cols"]),
     ],
         remainder="passthrough",
+        # переименовывание обрабатываемых колонок, оставляем непереименованными неиспользуемые колонки
+        verbose_feature_names_out=lambda transformer_name, feature_name: (
+            feature_name
+            if transformer_name == "remainder"
+            else f"{transformer_name}__{feature_name}"
+        ),
     )
-    scale_pipeline.set_output(transform="pandas")
+    scale_transformer.set_output(transform="pandas")
 
     feature_engineering_pipeline = Pipeline([
         ("lowess_smooth", FunctionTransformer(
@@ -107,9 +111,6 @@ def build_feature_engineering_pipeline() -> Pipeline:
                 "frac": fe['lowess_smooth']['frac'],
             })
         ),
-
-        scale_pipeline,
-
         ("add_log_returns", FunctionTransformer(
             add_log_returns,
             kw_args={
@@ -117,9 +118,6 @@ def build_feature_engineering_pipeline() -> Pipeline:
                 "col_prefix": fe['add_log_returns']['col_prefix'],
             })
          ),
-    ])
+        ("scale_transformer", scale_transformer),
+     ])
     return feature_engineering_pipeline
-
-
-def build_training_pipeline() -> Pipeline:
-    return Pipeline([])

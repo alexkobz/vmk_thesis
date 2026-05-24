@@ -1,8 +1,17 @@
 import numpy as np
 import pandas as pd
 
-from utils.read_yaml import *
-from utils.utils import show_shape
+from src.utils.read_yaml import (
+    boardid,
+    secid,
+    y_name,
+    issue_cumsum,
+    inn,
+    share_type,
+    is_vacation,
+    year,
+)
+from src.utils.utils import show_shape
 
 
 @show_shape
@@ -20,8 +29,8 @@ def drop_additional_issues(df: pd.DataFrame, by: str | list[str], template: str)
         .sort_values(by)
     )
     agg["is_issue"] = (agg["sumcap"] != agg["maxcap"]).astype(int)
-    agg["issue_cummax"] = agg.groupby("base_secid")["is_issue"].cummax()
-    agg[issue_cumsum] = agg.groupby("base_secid")["is_issue"].cumsum()
+    agg["issue_cummax"] = agg.groupby("base_secid")["is_issue"].cummax().fillna(0)
+    agg[issue_cumsum] = agg.groupby("base_secid")["is_issue"].cumsum().fillna(0)
 
     out = agg.merge(df, on=by, how="left")
     out[y_name] = out["sumcap"]
@@ -106,16 +115,3 @@ def filter_secids(df: pd.DataFrame, num: int) -> pd.DataFrame:
         secid_counts[secid_counts > num].index
     )]
     return df
-
-
-# def target_imputer(df: pd.DataFrame) -> pd.DataFrame:
-#     outstanding_shares = df[y_name] / df[close]
-#     mask = df[y_name].isna() & df[close].notna() & outstanding_shares.notna()
-#     df.loc[mask, y_name] = df.loc[mask, close] * outstanding_shares
-#     df[y_name] = df[y_name].fillna(df[y_name].median())
-#     return df
-
-# def filter_zero_target(df: pd.DataFrame) -> pd.DataFrame:
-#     s = df.groupby(level=secid)[y_log].apply(lambda x: np.abs(x).sum())
-#     secids_keep = s[s >= 1e-9].index
-#     return df.loc[pd.IndexSlice[secids_keep, :]]
