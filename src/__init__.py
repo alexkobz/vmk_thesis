@@ -1,8 +1,7 @@
-from src.utils import detect_outliers, apply_outlier_filter, restore_cap, prepare_xy
+from src.pipelines import (build_data_processing_pipeline,
+                           build_feature_engineering_pipeline)
 
 __all__ = [
-    "detect_outliers",
-    "apply_outlier_filter",
-    "restore_cap",
-    "prepare_xy",
+    "build_data_processing_pipeline",
+    "build_feature_engineering_pipeline",
 ]

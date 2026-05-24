@@ -1,21 +1,19 @@
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.inspection import permutation_importance
+from sklearn.metrics import make_scorer
 
-from config import config
-from src.forecast import ForecastConfig, EstimatorType
-from src.forecast.evaluate import scorer
+from config import DATA_DIR
+from src.training.evaluate import ic_score
 
 
-def get_feature_importances(forecaster, cfg: ForecastConfig, cols: list[str]) -> pd.Series:
+def get_feature_importances(forecaster, cols: list[str]) -> pd.Series:
 
     fp = forecaster.get_fitted_params(deep=True)
 
     if fp.get('estimator') is not None:
         fil = fp.get('estimator').feature_importances_[0]
         fis = fp.get('estimator').feature_importances_[1]
-        if cfg.estimator_type == EstimatorType.NGBOOST:
-            pass
         features = pd.DataFrame({
             'feature': cols,
             'importance_mean': fil,
@@ -31,7 +29,7 @@ def get_feature_importances(forecaster, cfg: ForecastConfig, cols: list[str]) ->
         ax.set_xticklabels(features['feature'], rotation=45, ha='right')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(config.DATA_DIR / 'artifacts' / 'fi.png')
+        plt.savefig(DATA_DIR / 'artifacts' / 'fi.png')
         plt.show()
         return pd.Series(features['importance_mean'], index=features['feature']).sort_values(ascending=False)
     return pd.Series()
@@ -40,8 +38,9 @@ def get_permutation_importances(
     forecaster,
     X_test,
     y_test,
-    scoring=scorer,
+    scoring=ic_score,
 ):
+    scorer = make_scorer(scoring, greater_is_better=True)
     res = permutation_importance(
         forecaster.estimator_,  # fitted sklearn-like estimator
         X_test,
@@ -66,7 +65,6 @@ def get_permutation_importances(
     ax.set_xticklabels(features['feature'], rotation=45, ha='right')
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
-    plt.savefig(config.DATA_DIR / 'artifacts' / 'pfi.png')
+    plt.savefig(DATA_DIR / 'artifacts' / 'pfi.png')
     plt.show()
     return pd.Series(res.importances_mean, index=X_test.columns).sort_values(ascending=False)
-

@@ -1,6 +1,6 @@
 """The ``flavor`` module provides an example for a custom model flavor for ``sktime`` library.
 
-This module exports ``sktime`` models in the following formats:
+This module exports ``sktime`` training in the following formats:
 
 sktime (native) format
     This is the main flavor that can be loaded back into ``sktime``, which relies on pickle
@@ -57,13 +57,11 @@ import pickle
 import sys
 from typing import Any
 
+import mlflow
 import numpy as np
 import pandas as pd
 import sktime
 import yaml
-from sktime.utils.multiindex import flatten_multiindex
-
-import mlflow
 from mlflow import pyfunc
 from mlflow.exceptions import MlflowException
 from mlflow.models import Model
@@ -72,25 +70,20 @@ from mlflow.models.utils import _save_example
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-from mlflow.utils.environment import (
-    _CONDA_ENV_FILE_NAME,
-    _CONSTRAINTS_FILE_NAME,
-    _PYTHON_ENV_FILE_NAME,
-    _REQUIREMENTS_FILE_NAME,
-    _mlflow_conda_env,
-    _process_conda_env,
-    _process_pip_requirements,
-    _PythonEnv,
-    _validate_env_arguments,
-)
+from mlflow.utils.environment import (_CONDA_ENV_FILE_NAME,
+                                      _CONSTRAINTS_FILE_NAME,
+                                      _PYTHON_ENV_FILE_NAME,
+                                      _REQUIREMENTS_FILE_NAME,
+                                      _mlflow_conda_env, _process_conda_env,
+                                      _process_pip_requirements, _PythonEnv,
+                                      _validate_env_arguments)
 from mlflow.utils.file_utils import write_to
-from mlflow.utils.model_utils import (
-    _add_code_from_conf_to_system_path,
-    _get_flavor_configuration,
-    _validate_and_copy_code_paths,
-    _validate_and_prepare_target_save_path,
-)
+from mlflow.utils.model_utils import (_add_code_from_conf_to_system_path,
+                                      _get_flavor_configuration,
+                                      _validate_and_copy_code_paths,
+                                      _validate_and_prepare_target_save_path)
 from mlflow.utils.requirements_utils import _get_pinned_requirement
+from sktime.utils.multiindex import flatten_multiindex
 
 FLAVOR_NAME = "sktime"
 
@@ -172,19 +165,19 @@ def save_model(
         A list of local filesystem paths to Python file dependencies (or directories
         containing file dependencies). These files are *prepended* to the system path
         when the model is loaded.
-    mlflow_model: mlflow.models.Model, optional (default=None)
-        mlflow.models.Model configuration to which to add the python_function flavor.
-    signature : mlflow.models.signature.ModelSignature, optional (default=None)
-        Model Signature mlflow.models.ModelSignature describes
+    mlflow_model: mlflow.training.Model, optional (default=None)
+        mlflow.training.Model configuration to which to add the python_function flavor.
+    signature : mlflow.training.signature.ModelSignature, optional (default=None)
+        Model Signature mlflow.training.ModelSignature describes
         model input and output :py:class:`Schema <mlflow.types.Schema>`. The model
-        signature can be :py:func:`inferred <mlflow.models.infer_signature>` from
+        signature can be :py:func:`inferred <mlflow.training.infer_signature>` from
         datasets with valid model input (e.g. the training dataset with target column
         omitted) and valid model output (e.g. model predictions generated on the
         training dataset), for example:
 
         .. code-block:: py
 
-          from mlflow.models import infer_signature
+          from mlflow.training import infer_signature
 
           train = df.drop_column("target_label")
           predictions = ...  # compute model predictions
@@ -318,17 +311,17 @@ def log_model(
     registered_model_name : str, optional (default=None)
         If given, create a model version under ``registered_model_name``, also creating
         a registered model if one with the given name does not exist.
-    signature : mlflow.models.signature.ModelSignature, optional (default=None)
-        Model Signature mlflow.models.ModelSignature describes
+    signature : mlflow.training.signature.ModelSignature, optional (default=None)
+        Model Signature mlflow.training.ModelSignature describes
         model input and output :py:class:`Schema <mlflow.types.Schema>`. The model
-        signature can be :py:func:`inferred <mlflow.models.infer_signature>` from
+        signature can be :py:func:`inferred <mlflow.training.infer_signature>` from
         datasets with valid model input (e.g. the training dataset with target column
         omitted) and valid model output (e.g. model predictions generated on the
         training dataset), for example:
 
         .. code-block:: py
 
-          from mlflow.models import infer_signature
+          from mlflow.training import infer_signature
 
           train = df.drop_column("target_label")
           predictions = ...  # compute model predictions
@@ -363,11 +356,11 @@ def log_model(
         The format in which to serialize the model. This should be one of the formats
         "pickle" or "cloudpickle"
     kwargs:
-        Additional arguments for :py:class:`mlflow.models.model.Model`
+        Additional arguments for :py:class:`mlflow.training.model.Model`
 
     Returns
     -------
-    A :py:class:`ModelInfo <mlflow.models.model.ModelInfo>` instance that contains the
+    A :py:class:`ModelInfo <mlflow.training.model.ModelInfo>` instance that contains the
     metadata of the logged model.
     """
     return Model.log(
