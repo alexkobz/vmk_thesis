@@ -334,7 +334,7 @@ def parse_bool(value: str) -> bool:
 
 def build_train_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("model_config", choices=sorted(model_configs))
+    parser.add_argument("model", choices=sorted(model_configs))
     parser.add_argument("--n-estimators", type=int)
     parser.add_argument("--learning-rate", type=float)
     parser.add_argument("--random-state", type=int)
