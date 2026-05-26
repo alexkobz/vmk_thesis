@@ -7,7 +7,11 @@ from config import DATA_DIR
 from src.training.evaluate import ic_score
 
 
-def get_feature_importances(forecaster, cols: list[str]) -> pd.Series:
+def get_feature_importances(
+    forecaster,
+    cols: list[str],
+    save_path=DATA_DIR / "processed" / "pi.png",
+) -> pd.Series:
 
     fp = forecaster.get_fitted_params(deep=True)
 
@@ -29,7 +33,8 @@ def get_feature_importances(forecaster, cols: list[str]) -> pd.Series:
         ax.set_xticklabels(features['feature'], rotation=45, ha='right')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(DATA_DIR / 'artifacts' / 'fi.png')
+        if save_path:
+            plt.savefig(save_path)
         plt.show()
         return pd.Series(features['importance_mean'], index=features['feature']).sort_values(ascending=False)
     return pd.Series()
@@ -39,7 +44,8 @@ def get_permutation_importances(
     X_test,
     y_test,
     scoring=ic_score,
-):
+    save_path=DATA_DIR / 'processed' / 'pfi.png',
+) -> pd.Series:
     scorer = make_scorer(scoring, greater_is_better=True)
     res = permutation_importance(
         forecaster.estimator_,  # fitted sklearn-like estimator
@@ -65,6 +71,7 @@ def get_permutation_importances(
     ax.set_xticklabels(features['feature'], rotation=45, ha='right')
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
-    plt.savefig(DATA_DIR / 'artifacts' / 'pfi.png')
+    if save_path:
+        plt.savefig(save_path)
     plt.show()
     return pd.Series(res.importances_mean, index=X_test.columns).sort_values(ascending=False)
