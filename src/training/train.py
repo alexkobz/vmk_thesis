@@ -1,6 +1,5 @@
 import mlflow
 import numpy as np
-import pandas as pd
 from sktime.forecasting.compose import YfromX
 
 from logs.logger import logger
@@ -19,7 +18,6 @@ from src.utils import (
 from src.utils.training import (
     ExpandingWindowYearSplitter,
     prepare_yfromx_fold,
-    align_y,
 )
 
 METRIC_FNS = {
@@ -87,14 +85,14 @@ def train(cfg: ModelConfig) -> YfromX:
 
             model.fit(y_train, X=X_train)
             y_pred = model.predict(fh=fh, X=X_pred)
-            
-            y_test, y_pred = align_y(y_test, y_pred)
-            # y_pred_clipped = y_pred.clip(-0.05, 0.05)
+            y_pred = y_pred.iloc[:, 0]
+            y_test = y_test.iloc[:, 0]
+            y_pred, y_test = y_pred.align(y_test, join="inner")
+            logger.info(
+                f"Fold {fold}: y pred shape: {y_pred.shape}"
+            )
             y_test_cap = restore_cap(y_test, cap0)
             y_pred_cap = restore_cap(y_pred, cap0)
-            # y_pred_cap = y_pred_cap.groupby(level="secid").transform(
-            #     lambda s: s.clip(s.quantile(0.01), s.quantile(0.99))
-            # )
 
             fold_metrics = {}
             for m in tr["evaluate"]["metrics"]:
@@ -102,11 +100,9 @@ def train(cfg: ModelConfig) -> YfromX:
                 fn = METRIC_FNS[m["function"]]
 
                 if m.get("use_cap", False):
-                    y_true, y_pred = y_test_cap, y_pred_cap
+                    value = fn(y_test_cap, y_pred_cap)
                 else:
-                    y_true, y_pred = y_test, y_pred
-
-                value = fn(y_true, y_pred)
+                    value = fn(y_test, y_pred)
                 fold_metrics[name] = value
                 mlflow.log_metric(name, value, step=fold)
 
@@ -116,7 +112,7 @@ def train(cfg: ModelConfig) -> YfromX:
             name = m["name"]
             vals = [r[name] for r in metrics if name in r]
             if vals:
-                mlflow.log_metric(f"{name}_mean", float(np.mean(vals)))
+                mlflow.log_metric(f"{name}_mean", float(np.nanmean(vals)))
         flavor.log_model(
             sktime_model=model,
             artifact_path="training",
@@ -130,7 +126,7 @@ def train(cfg: ModelConfig) -> YfromX:
 if __name__ == "__main__":
     args = build_train_parser().parse_args()
     try:
-        cfg = apply_cli_overrides(model_configs[args.model_config], args)
+        cfg = apply_cli_overrides(model_configs[args.model], args)
         train(cfg)
     except KeyError:
         logger.info('Invalid model configuration. Please choose from: %s', sorted(model_configs))

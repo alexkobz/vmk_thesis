@@ -26,19 +26,19 @@ class ModelConfig:
     X: list[str]
 
 model_configs = {
-    'ridge': ModelConfig(
-        run_name="ridge",
+    'linear': ModelConfig(
+        run_name="linear",
         estimator=NGBRegressor,
         Base=default_linear_learner,
         Dist=Normal,
-        n_estimators=tr['ridge']['n_estimators'],
-        learning_rate=tr['ridge']['learning_rate'],
-        random_state=tr['ridge']['random_state'],
-        verbose=tr['ridge']['verbose'],
-        pooling=tr['ridge']['pooling'],
-        min_train_years=tr['ridge']['min_train_years'],
-        y=tr['ridge']['y'],
-        X=tr['ridge']['X'],
+        n_estimators=tr['linear']['n_estimators'],
+        learning_rate=tr['linear']['learning_rate'],
+        random_state=tr['linear']['random_state'],
+        verbose=tr['linear']['verbose'],
+        pooling=tr['linear']['pooling'],
+        min_train_years=tr['linear']['min_train_years'],
+        y=tr['linear']['y'],
+        X=tr['linear']['X'],
     ),
 
     'base': ModelConfig(
@@ -69,5 +69,20 @@ model_configs = {
         min_train_years=tr['main']['min_train_years'],
         y=tr['main']['y'],
         X=tr['main']['X'],
+    ),
+
+    'selected': ModelConfig(
+        run_name="selected",
+        estimator=NGBRegressor,
+        Base=default_tree_learner,
+        Dist=Normal,
+        n_estimators=tr['selected']['n_estimators'],
+        learning_rate=tr['selected']['learning_rate'],
+        random_state=tr['selected']['random_state'],
+        verbose=tr['selected']['verbose'],
+        pooling=tr['selected']['pooling'],
+        min_train_years=tr['selected']['min_train_years'],
+        y=tr['selected']['y'],
+        X=tr['selected']['X'],
     ),
 }

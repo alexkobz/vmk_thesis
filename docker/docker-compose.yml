@@ -33,21 +33,6 @@ services:
       --host 0.0.0.0
       --port 5000
 
-#  db:
-#    image: postgres:15
-#    container_name: postgres
-#    environment:
-#      POSTGRES_USER: admin
-#      POSTGRES_PASSWORD: admin
-#      POSTGRES_DB: public
-#    ports:
-#      - "5432:5432"
-#    volumes:
-#      - vmk_thesis:/var/lib/postgresql/data
-#
-#volumes:
-#  vmk_thesis:
-#    external: true
 
 networks:
   mlflow-net:

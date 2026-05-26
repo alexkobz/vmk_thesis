@@ -597,7 +597,7 @@ training:
 
   tracking_uri: http://localhost:5005/
 
-  ridge:
+  linear:
     model_type: linear
     n_estimators: 100
     learning_rate: 0.01
@@ -1254,6 +1254,18 @@ training:
       - st__sm__line_6330
       - st__sm__line_6350
 
+  selected:
+    model_type: ngboost
+    n_estimators: 100
+    learning_rate: 0.01
+    random_state: 42
+    verbose: True
+    pooling: global
+    min_train_years: 4
+    y: lr__dailycapitalization_1
+    X:
+      # TODO: add features here
+
   evaluate:
     metrics:
       - name: wmape
@@ -1263,6 +1275,11 @@ training:
         function: wf1
       - name: ic
         function: ic
+
+
+feature_importances:
+
+
 
 mults:
   - capex_revenue_rsbu
